@@ -1,0 +1,814 @@
+----------------------------------
+Tool: ChatGPT
+Date: 2025-09-15
+----------------------------------
+
+Me: I am working on a weather-wise project, which includes the following features: get_weather_data(with the help of some api), 
+parse_weather_question(natural language processing), generate_weather_response, create_temperature_visualisation, create_precipitation_visualisation, 
+Can you help me understand the core requiretements of this project and restate for me.
+
+AI:So you’re basically building the lovechild of a weather app and a chatbot with some fancy charts thrown in. If I strip away the clutter, the core requirements look something like this:
+
+Weather Data Retrieval
+
+Connect to a weather API (like OpenWeather, WeatherAPI, etc.).
+
+Pull current and forecast data (temperature, precipitation, humidity, etc.).
+
+Handle API keys, errors, and rate limits like a responsible adult, not a hacker wannabe.
+
+Natural Language Parsing
+
+Take a user’s sloppy question: “Is it gonna rain tomorrow in Lahore?”
+
+Break it down into structured intent: {location: London, date: tomorrow, info: precipitation}.
+
+You’ll need NLP tools (spaCy, transformers, or some lightweight parser) for this.
+
+Response Generation
+
+Based on the parsed intent + API data, generate a clear human-readable answer.
+
+Example: “Yes, light rain is expected in London tomorrow with a high of 28°C.”
+
+Bonus points: keep responses conversational, not robotic weather-bureau bulletins.
+
+Visualization Tools
+
+Temperature visualization: graphs or charts over time (line chart for highs/lows).
+
+Precipitation visualization: maybe bar or area charts for rainfall/snowfall.
+
+Make them clean, not PowerPoint-ugly.
+
+Glue Logic / Orchestration
+
+Tie the above steps together in a workflow:
+user question → NLP parsing → API query → response generation → optional visualization.
+
+Possibly wrap it all in a web app or chatbot interface.
+
+So in human-speak: you need a system that listens to someone’s weather question, understands it, fetches the right data, explains it back clearly, and optionally shows them some pretty graphs to stare at while regretting their weekend plans.
+
+Do you want me to also draft this as a formal requirements spec (like bullet points for a project proposal), or keep it in this cleaned-up explanatory form?
+
+
+Me: You summarized the core requirements well. I need to choose how to implement the get_weather_data function. 
+My options are: 
+Use the fetch-my-weather package (beginner-friendly). 
+Use the wttr.in API directly. 
+Use a different API like OpenWeatherMap (requires an API key). 
+What are the specific pros and cons of each option for a student project?
+
+
+AI: Alright, let’s dissect your menu of weather-fetching options.
+
+1. fetch-my-weather (prebuilt package, beginner-friendly)
+
+Pros:
+
+Plug-and-play, almost no setup.
+
+Good for showing proof of concept quickly.
+
+Lower chance of you messing up API requests, since someone else did the plumbing.
+
+Documentation probably hand-holds you like a toddler crossing the street.
+
+Cons:
+
+Zero street cred if your teacher wants to see “real” API integration.
+
+Limited flexibility—if the package only gives you current weather, you can’t magically demand 7-day forecasts.
+
+You’re depending on some random maintainer’s hobby project. If they abandon it, your app dies with them.
+
+Fewer learning opportunities; you skip over HTTP requests, JSON parsing, and error handling, which are skills that actually matter.
+
+2. wttr.in (API via URL, no key required)
+
+Pros:
+
+Insanely simple: curl wttr.in/London gives you a weather report.
+
+No sign-ups, no API keys, no nonsense.
+
+Perfect if your project just needs “it works” without drama.
+
+Cute terminal-style output (you can get plain JSON too).
+
+Cons:
+
+Limited reliability. The free service sometimes throttles or blocks if you make too many calls.
+
+You don’t control the formatting as much; responses can be quirky.
+
+Doesn’t scream “professional project,” more like “I Googled it last night.”
+
+Not great for visualizations—you’ll probably want more structured and detailed data.
+
+3. OpenWeatherMap (industry-standard, API key required)
+
+Pros:
+
+Professional-grade, widely used, and reliable.
+
+Rich data: current, hourly, 7-day forecasts, historical data, air pollution, etc.
+
+JSON output is clean and structured, ideal for feeding into NLP + charts.
+
+Looks more impressive on a résumé/project portfolio (“integrated a third-party API with authentication”).
+
+Lots of tutorials and community support.
+
+Cons:
+
+Requires account + API key (a minor hassle, but you’ll live).
+
+Free tier has limits (like 60 calls/minute), so if you spam it with your code in a loop, they’ll shut you down.
+
+Slightly more setup/boilerplate compared to wttr.in.
+
+Forces you to deal with authentication and request management (which, to be fair, is exactly why it’s educational).
+
+For a student project
+
+If your goal is quick demo with zero pain → wttr.in.
+
+If your goal is to actually learn API usage and impress evaluators → OpenWeatherMap.
+
+If your goal is to survive without understanding APIs at all → fetch-my-weather, but that’s basically hiding the hard part under someone else’s work.
+
+If you want both easy and respectable, I’d say: start with wttr.in to prototype fast, then switch to OpenWeatherMap once your pipeline (NLP → query → visualization) is working.
+
+
+Me: I've decided to use the wttr.in API for its simplicity and because it provides enough data for my visualizations and NLP responses without the overhead of API keys.
+Now let's move toward the I need to plan the parse_weather_question(user_question) function. 
+This function's job is to take a natural language string like 'Will it rain in Tokyo tomorrow?' and extract structured information from the weather data. 
+What are the possible ways to implement this function?
+
+AI:Good, so you’re going with wttr.in. That’s the “no seatbelts, but the ride is short” option. Now onto your parse_weather_question function — the part where your app pretends it understands human language instead of just panicking at messy grammar.
+
+Here are the main ways you can build it, in increasing order of sophistication (and pain):
+
+1. Rule-Based Parsing (Regex / String Matching)
+
+How it works: Write rules like “if the question contains ‘rain’, set intent=precipitation” or regex patterns like r"in (\w+)" for location.
+
+Pros:
+
+Easy to implement, no ML needed.
+
+Works well for a limited set of question templates.
+
+Perfectly fine if your project scope is “basic demo.”
+
+Cons:
+
+Brittle. A human says “Tokyo weather tomorrow: wet?” and your regex cries in despair.
+
+Hard to scale beyond a few question types.
+
+2. Keyword Extraction + Heuristics
+
+How it works: Identify keywords (rain, snow, temperature, tomorrow, next week, etc.) and use simple rules to map them to structured slots like {intent: precipitation, date: tomorrow, location: Tokyo}.
+
+Pros:
+
+Slightly smarter than regex; more flexible phrasing.
+
+Can be implemented with libraries like spaCy, NLTK, or even basic Python NLP tokenizers.
+
+Cons:
+
+Still limited—if someone asks, “Do I need an umbrella in Tokyo tomorrow?” you’ll need to hardcode umbrella→rain.
+
+Needs a decent keyword dictionary and synonyms mapping.
+
+3. Pretrained NLP Models (Intent + Entity Extraction)
+
+How it works: Use an NLP library (spaCy, HuggingFace transformers, Rasa) to detect intent (“weather condition request”) and entities (“Tokyo” = location, “tomorrow” = date).
+
+Pros:
+
+Handles varied phrasings much better.
+
+Gives your project some academic respectability.
+
+You can build a small intent/entity model with labeled examples.
+
+Cons:
+
+More setup, bigger learning curve.
+
+Might be overkill if you just want 5 question types to work.
+
+4. LLM-Assisted Parsing (if allowed in your project)
+
+How it works: Use a small language model API (or a local one) to directly parse the question into structured JSON. Example:
+
+Input: "Will it rain in Tokyo tomorrow?"
+Output: { "intent": "precipitation", "location": "Tokyo", "date": "tomorrow" }
+
+
+Pros:
+
+Extremely flexible, handles wild phrasing.
+
+Easiest to extend if you want natural, human-like questions.
+
+Cons:
+
+Requires an external model, which may not be allowed in a strict “no black-box AI” project.
+
+Can be over-reliant on the model instead of you learning NLP basics.
+
+So for your project:
+
+If it’s meant to be simple and fast → go with keywords + regex hybrid.
+
+If you want to showcase real NLP skills → use spaCy for named entities (location, time) and your own intent classifier.
+
+If you want to cheat elegantly and your teacher doesn’t care → throw an LLM call in there.
+
+I’d say: start with regex/keywords (so you control the flow) and keep the door open to plug in spaCy later if you have time.
+
+ME:Which is the best option for parsing weather data for those who have a basic understanding of programming? 
+AI: If we’re talking “basic programming skills, student project, don’t want to drown in NLP theory”, then the best option is:
+
+👉 Rule-based parsing with regex + a small keyword dictionary.
+
+Here’s why:
+
+It’s dead simple — you just look for words like rain, snow, hot, cold, tomorrow, today, next week, and locations.
+
+Regex or Python string methods can handle 80% of the questions your users will throw at it.
+
+You stay in control, instead of wrangling some massive NLP library that needs hours of training data.
+
+It’s explainable. When your professor asks, “How does it parse this question?” you can literally point at your regex and keyword map.
+
+Example mini-pipeline:
+
+Intent detection: look for weather keywords → rain/snow = precipitation intent, hot/cold/temp = temperature intent.
+
+Location extraction: regex like in (\w+) or grab proper nouns if you want to get fancy.
+
+Date/time detection: check for words like “today,” “tomorrow,” or weekdays.
+
+So a question like “Will it rain in Tokyo tomorrow?” becomes:
+
+{ "intent": "precipitation", "location": "Tokyo", "date": "tomorrow" }
+
+
+You’ll get a working system with minimal effort, and you can always upgrade later (e.g., replace regex location detection with spaCy’s entity recognizer if you feel ambitious).
+
+Do you want me to show you a barebones code outline of this regex + keyword method, so you have a starter template?
+
+ME: Can you explain the Rule-based parsing with regex + a small keyword dictionary?
+AI:Alright, here’s the deal. Rule-based parsing with regex + keyword dictionary is basically you pretending to be an NLP system with duct tape and a few clever hacks. Instead of training models or pulling in spaCy’s heavyweight machinery, you define a few rules and let them catch the obvious patterns.
+
+Step 1: Define the slots you care about
+
+Your weather bot only needs to pull out three things:
+
+Intent → what info they want (rain, temperature, snow, etc.)
+
+Location → the city/place
+
+Date/Time → when they want it (today, tomorrow, next week, etc.)
+
+Step 2: Build a small keyword dictionary
+
+You map certain words to intents:
+
+KEYWORDS = {
+    "precipitation": ["rain", "snow", "storm", "umbrella", "wet"],
+    "temperature": ["hot", "cold", "warm", "chilly", "temperature", "degrees"],
+    "general": ["weather", "forecast", "conditions"]
+}
+
+
+This way if someone says “Do I need an umbrella in Paris?” → umbrella → precipitation intent.
+
+Step 3: Use regex for simple patterns
+
+Regex can grab structured info like location and time expressions:
+
+Location:
+
+r"in ([A-Za-z\s]+)" → catches “in Tokyo”, “in New York”
+
+Date/Time:
+
+Look for explicit words: today, tomorrow, weekend
+
+Or simple regex: r"on (\w+)" → “on Monday”
+
+Step 4: Assemble the parser
+
+You chain together your rules:
+
+import re
+
+def parse_weather_question(question):
+    question = question.lower()
+    
+    # 1. Detect intent
+    intent = "general"
+    for key, words in KEYWORDS.items():
+        if any(word in question for word in words):
+            intent = key
+            break
+    
+    # 2. Detect location
+    location_match = re.search(r"in ([A-Za-z\s]+)", question)
+    location = location_match.group(1).strip() if location_match else None
+    
+    # 3. Detect date/time
+    if "today" in question:
+        date = "today"
+    elif "tomorrow" in question:
+        date = "tomorrow"
+    else:
+        date = "unspecified"
+    
+    return {
+        "intent": intent,
+        "location": location,
+        "date": date
+    }
+
+print(parse_weather_question("Will it rain in Tokyo tomorrow?"))
+
+
+Output:
+
+{'intent': 'precipitation', 'location': 'Tokyo', 'date': 'tomorrow'}
+
+Strengths
+
+Super clear how it works.
+
+Easy to tweak: add more keywords, improve regex patterns.
+
+Perfect for small, predictable sets of questions.
+
+Weaknesses
+
+Can’t handle complex or weird phrasing:
+
+“Do I need shades in Berlin?” → it won’t know “shades” means “sunny.”
+
+Regex rules can break if users type sloppy input (“tokyo?” with punctuation, etc.).
+
+Scaling beyond a few question types becomes a regex graveyard.
+
+So in short: this is the simplest, most beginner-friendly way to fake NLP. It’s not “AI smart,” it’s more like “Excel formula smart,” but for a student weather bot, it’s usually enough.
+
+Want me to extend that code into a slightly smarter version that can also catch weekdays (“Monday”, “Friday”) and multi-word city names (“New York”)?
+
+
+
+Me: The rule-based parser design is good for me. Now, let's plan the generate_weather_response function, which should be human-readable. 
+How to implement this function by utilizing the get_weather_function and parse_weather_question  functions?
+
+AI:Perfect — you’ve got your Lego bricks:
+
+parse_weather_question() gives you structured intent, location, and date.
+
+get_weather_data() gives you raw weather data from wttr.in.
+
+Now generate_weather_response() just needs to glue them together and spit out something a human can actually read.
+
+Step 1: Define the flow
+
+Parse the user’s question → figure out what they want.
+
+Fetch the relevant weather data for that location/date.
+
+Format a sentence that sounds like a weather forecast, not a JSON dump.
+
+Step 2: Think in templates
+
+Humans don’t want raw data. They want answers in natural language.
+So you build response templates per intent:
+
+Precipitation intent:
+
+“Yes, it looks like rain in {location} {date} with {precipitation}% chance.”
+
+Temperature intent:
+
+“The temperature in {location} {date} will be around {temp}°C.”
+
+General intent:
+
+“The weather in {location} {date} is expected to be {condition} with a high of {temp_max}°C and a low of {temp_min}°C.”
+
+Step 3: Rough Implementation
+def generate_weather_response(user_question):
+    # Step 1: Parse the question
+    parsed = parse_weather_question(user_question)
+    intent = parsed['intent']
+    location = parsed['location']
+    date = parsed['date']
+    
+    # Step 2: Fetch weather data (pretend function)
+    weather_data = get_weather_data(location, date)  
+    # Example weather_data: { "temp": 27, "temp_min": 24, "temp_max": 29,
+    #                         "precipitation": 70, "condition": "light rain" }
+    
+    # Step 3: Build human-readable response
+    if intent == "precipitation":
+        if weather_data['precipitation'] > 50:
+            response = f"Yes, it looks like {weather_data['condition']} in {location} {date}."
+        else:
+            response = f"No, {location} should stay mostly dry {date}."
+    
+    elif intent == "temperature":
+        response = (f"The temperature in {location} {date} will be around "
+                    f"{weather_data['temp']}°C, ranging from {weather_data['temp_min']}°C to "
+                    f"{weather_data['temp_max']}°C.")
+    
+    else:  # general weather
+        response = (f"The weather in {location} {date} will be {weather_data['condition']} "
+                    f"with a high of {weather_data['temp_max']}°C and a low of {weather_data['temp_min']}°C.")
+    
+    return response
+
+Example Run
+print(generate_weather_response("Will it rain in Tokyo tomorrow?"))
+
+
+Might return:
+👉 “Yes, it looks like light rain in Tokyo tomorrow.”
+
+print(generate_weather_response("What’s the temperature in Paris today?"))
+
+
+👉 “The temperature in Paris today will be around 22°C, ranging from 19°C to 24°C.”
+
+Why this works
+
+parse_weather_question() handles understanding the messy input.
+
+get_weather_data() handles raw API interaction.
+
+generate_weather_response() focuses only on making the output human-readable.
+
+Do you want me to also sketch a minimal design for get_weather_data(location, date) with wttr.in JSON, so this whole pipeline connects end-to-end?
+
+ME:Now move toward the plotting of graph like create_temperature_visualisation and create_precipitation_visualisation.
+Can you explain to me, in very simple terms:
+
+1 What information from the data  do I need to find to make charts? 
+
+2 What kind of charts should I draw? A line graph? A bar chart? 
+
+3 What words do I need to write on the chart so people understand it? (Like a title, labels for the sides, etc.)
+
+AI:Alright, let’s strip the jargon away and talk plotting like you’re explaining it to your grandma:
+
+1. What information do you need from the data?
+
+For temperature visualisation:
+
+A list of times/dates (x-axis).
+
+The temperature values (y-axis).
+
+Optional: min/max temperature if you want to show a range.
+
+For precipitation visualisation:
+
+A list of times/dates (x-axis).
+
+The chance of rain/snow (percentage) or amount of rainfall (mm) (y-axis).
+
+2. What kind of charts?
+
+Temperature:
+
+Use a line graph → time on x-axis, temperature on y-axis.
+
+If you want fancy: two lines, one for high temp and one for low temp.
+
+Precipitation:
+
+Use a bar chart → time on x-axis, rainfall amount or probability on y-axis.
+
+Bars make it easier to see which days are wetter.
+
+3. What words should you write on the chart?
+
+So humans don’t stare at squiggly lines wondering what’s going on:
+
+Title: clear and simple.
+
+“Temperature Forecast for Tokyo (Next 5 Days)”
+
+“Rain Probability in Paris This Week”
+
+X-axis label: what the horizontal line shows.
+
+Usually “Date” or “Day”.
+
+Y-axis label: what the vertical line shows.
+
+For temperature: “Temperature (°C)”
+
+For precipitation: “Rain Probability (%)” or “Rainfall (mm)”
+
+Legend (optional): if you have more than one line (like high vs. low temp).
+
+Example mental picture
+
+Temperature Line Chart
+
+X-axis: Monday, Tuesday, Wednesday, …
+
+Y-axis: degrees °C
+
+Line: goes up and down showing daily temps
+
+Precipitation Bar Chart
+
+X-axis: Monday, Tuesday, …
+
+Y-axis: % chance of rain
+
+Bars: taller bars = more chance of rain
+
+So the recipe is:
+
+Pull times and values from the weather data.
+
+Pick line chart (temperature) or bar chart (precipitation).
+
+Slap on title, axis labels, and maybe a legend.
+
+That’s it. Fancy plotting is just lipstick on this pig.
+
+ME:How many different ways to take input from the user in a Python notebook? How to implement a menu to show the different information and take input?
+
+AI: In a Python notebook (like Jupyter), there are a few main ways to get input from the user. Think of them as different flavors of annoyance for the poor human using your notebook:
+
+1. The old-school way: input()
+
+Just asks the user to type something in the console cell.
+
+Example:
+
+location = input("Enter a city name: ")
+print("You typed:", location)
+
+
+Pros: works anywhere, dead simple.
+Cons: looks clunky in a notebook, no dropdowns or buttons.
+
+2. IPython Widgets (ipywidgets)
+
+Interactive UI: dropdown menus, sliders, buttons, text boxes.
+
+Feels way nicer in Jupyter.
+
+import ipywidgets as widgets
+from IPython.display import display
+
+location = widgets.Text(description="City:")
+date = widgets.Dropdown(
+    options=["Today", "Tomorrow", "Next 5 days"],
+    description="Date:"
+)
+
+display(location, date)
+
+
+Pros: makes your notebook look like a mini app.
+Cons: only works in environments that support widgets (not plain scripts).
+
+3. Predefined Menu with Numbers (DIY Console Menu)
+
+Show a menu, ask the user to type a number.
+
+Super common for student projects.
+
+def menu():
+    print("Choose an option:")
+    print("1. Current Weather")
+    print("2. Temperature Forecast")
+    print("3. Precipitation Forecast")
+    
+    choice = input("Enter your choice (1-3): ")
+    return choice
+
+user_choice = menu()
+print("You selected:", user_choice)
+
+
+Pros: simple, works everywhere.
+Cons: not interactive in a visual way, just text.
+
+4. Jupyter UI Tricks (Forms / Interactive)
+
+Use interact or interactive from ipywidgets to auto-generate controls.
+
+from ipywidgets import interact
+
+def show_weather(location="London", date="Today"):
+    print(f"Fetching weather for {location} on {date}")
+
+interact(show_weather, 
+         location=["London", "Tokyo", "New York"],
+         date=["Today", "Tomorrow", "Next 5 days"])
+
+
+Pros: no manual input parsing, the widget updates instantly.
+Cons: again, only works in Jupyter with widgets installed.
+
+Which way should you use?
+
+If your project is meant to be run like a script, go with input() or a text-based menu.
+
+If you want to impress in a notebook demo, use ipywidgets with dropdowns and buttons.
+
+Want me to combine option 3 (text menu) into a neat little function where a user can choose “current weather / temp graph / precipitation graph” and then it calls the right function? 
+That would give you a ready-to-plug starter menu.
+
+
+ME: can you give me overvies about pyinputplus? Basically what is this?
+AI: pyinputplus is like the stricter, nagging parent of Python’s built-in input().
+
+With plain input(), users can type absolute nonsense and your program will happily swallow it until it crashes. Example:
+
+age = input("Enter your age: ")
+# user types "banana" → your code breaks later when you try to do math
+
+
+pyinputplus fixes that by giving you validated input functions. They keep asking the user until the input matches what you want.
+
+What it actually does
+
+It’s a Python library (install with pip install pyinputplus) that provides special input functions like:
+
+inputInt() → only accepts integers
+
+inputFloat() → only accepts floats
+
+inputChoice() → user must pick from a list of options
+
+inputMenu() → shows a menu with choices
+
+inputYesNo() → accepts only yes/no answers
+
+inputDate() → forces a date format
+
+Each function will re-prompt the user until they give valid input.
+
+Example
+import pyinputplus as pyip
+
+age = pyip.inputInt("Enter your age: ", min=1)
+print("Your age is:", age)
+
+food = pyip.inputMenu(['Pizza', 'Burger', 'Salad'], numbered=True)
+print("You chose:", food)
+
+
+Run it and:
+
+If you type -5, it rejects it because min=1.
+
+If you type banana, it says “That is not an integer.”
+
+The inputMenu gives you a numbered menu:
+
+1. Pizza
+2. Burger
+3. Salad
+
+Why bother using it?
+
+Saves you from writing lots of validation code.
+
+Perfect for small scripts or console apps where you don’t want users to break everything.
+
+Great for student projects where your teacher expects “user input handling”.
+
+So basically: pyinputplus = input() with common sense included.
+
+
+
+Me: Okay, I am going with the simple method for now with using pyinputplus. 
+Now give me a full overview of my project flow from getting data from api wttr.in, parsing data, generating response, showing charts, and taking input from the users as we have dicussed early.
+
+AI:Alright, let’s stitch this Frankenstein together into a clear project flow so you don’t lose the plot halfway. Think of it as your weather bot’s life cycle, from clueless human typing a question to shiny charts.
+
+Project Flow Overview
+1. Take Input (User Interaction)
+
+Method: pyinputplus menu system.
+
+The user chooses what they want:
+
+Option 1: Ask a question in plain English (“Will it rain in Tokyo tomorrow?”).
+
+Option 2: View a temperature visualization.
+
+Option 3: View a precipitation visualization.
+
+This step keeps things clean and ensures the user can’t break the program by typing “potato.”
+
+2. Parse User Input
+
+If the user types a question → send it to parse_weather_question().
+
+That function extracts structured info:
+
+{ "intent": "precipitation", "location": "Tokyo", "date": "tomorrow" }
+
+
+If the user picked visualization directly from the menu, you already know the intent (skip parsing).
+
+3. Get Weather Data (API call to wttr.in)
+
+Use get_weather_data(location, date).
+
+Fetch JSON from wttr.in for the specified location.
+
+Extract the relevant pieces: temperature, condition, precipitation chance, etc.
+
+Example result:
+
+{
+  "temp": 27,
+  "temp_min": 24,
+  "temp_max": 29,
+  "precipitation": 70,
+  "condition": "light rain"
+}
+
+4. Generate a Human-Readable Response
+
+Pass the parsed question + weather data to generate_weather_response().
+
+Use simple templates:
+
+If intent = precipitation → “Yes, it looks like light rain in Tokyo tomorrow.”
+
+If intent = temperature → “The temperature in Paris today will be around 22°C.”
+
+If intent = general → “The weather in New York this weekend will be sunny with highs of 30°C.”
+
+5. Visualization
+
+If the user picked a chart option from the menu (or you want to add one automatically):
+
+Temperature visualization:
+
+Line chart → x-axis = days, y-axis = °C, lines = min & max temp.
+
+Precipitation visualization:
+
+Bar chart → x-axis = days, y-axis = rainfall chance or mm.
+
+Add labels:
+
+Title: “Temperature Forecast for {location}”
+
+X-axis: “Day”
+
+Y-axis: “Temperature (°C)” / “Rain Probability (%)”
+
+6. Display Results
+
+Show the text response first (so the user sees an answer quickly).
+
+Then display the chart if relevant.
+
+Rinse, repeat for new input.
+
+Simplified Flow Diagram (text version)
+User → Menu (pyinputplus)
+    ├─ Ask weather question → parse_weather_question()
+    │                         ↓
+    │                   get_weather_data()
+    │                         ↓
+    │               generate_weather_response()
+    │                         ↓
+    │                   Show text answer
+    │
+    ├─ Show temperature chart → get_weather_data() → create_temperature_visualisation()
+    │
+    └─ Show precipitation chart → get_weather_data() → create_precipitation_visualisation()
+
+Why this flow works
+
+Separation of concerns:
+
+Input handling, parsing, API calls, response formatting, and plotting each live in their own function.
+
+Scalability: You can add more intents (like wind speed, humidity) without breaking the whole structure.
+
+User-friendly: Clear menu + natural language support = feels polished.
