@@ -1,0 +1,163 @@
+
+----------------------------------
+Tool: ChatGPT
+Date: 2025-09-18
+----------------------------------
+
+
+ME:Now give the implementation of create_temperature_visualisation() and create_precipitation_visualisation() 
+For temperature visualisation:
+
+A list of times/dates (x-axis).
+
+The temperature values (y-axis).
+
+Optional: min/max temperature if you want to show a range.
+
+For precipitation visualisation:
+
+A list of times/dates (x-axis).
+
+The chance of rain/snow (percentage) or amount of rainfall (mm) (y-axis).
+
+Use a line graph → time on x-axis, temperature on y-axis.
+Precipitation:
+
+Use a bar chart → time on x-axis, rainfall amount or probability on y-axis.
+
+
+
+
+
+AI:Perfect timing — we’re now at the visualization step 🚀
+
+I’ll implement two functions:
+
+create_temperature_visualisation(weather_data, output_type='display')
+
+create_precipitation_visualisation(weather_data, output_type='display')
+
+Both will use matplotlib to plot forecast data.
+
+Implementation
+import matplotlib.pyplot as plt
+
+# ------------------ Temperature Visualisation ------------------
+def create_temperature_visualisation(weather_data, output_type='display'):
+    """
+    Create visualization of temperature data.
+
+    Args:
+        weather_data (dict): The processed weather data with 'forecast'
+        output_type (str): Either 'display' (show plot) or 'figure' (return figure object)
+
+    Returns:
+        If output_type == 'figure', returns the matplotlib figure object
+        Otherwise, displays the visualization in the notebook
+    """
+    forecast = weather_data.get("forecast", [])
+    if not forecast:
+        print("No forecast data available for temperature visualization.")
+        return None
+
+    # Extract dates and temperature ranges
+    dates = [f["date"] for f in forecast]
+    min_temps = [int(f["min_temp_C"]) for f in forecast]
+    max_temps = [int(f["max_temp_C"]) for f in forecast]
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(dates, min_temps, marker="o", label="Min Temp (°C)")
+    ax.plot(dates, max_temps, marker="o", label="Max Temp (°C)")
+    ax.fill_between(dates, min_temps, max_temps, color="lightblue", alpha=0.3)
+
+    ax.set_title("Temperature Forecast")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Temperature (°C)")
+    ax.legend()
+    ax.grid(True, linestyle="--", alpha=0.6)
+
+    if output_type == "figure":
+        return fig
+    else:
+        plt.show()
+        return None
+
+
+# ------------------ Precipitation Visualisation ------------------
+def create_precipitation_visualisation(weather_data, output_type='display'):
+    """
+    Create visualization of precipitation chances.
+
+    Args:
+        weather_data (dict): The processed weather data with 'forecast'
+        output_type (str): Either 'display' (show plot) or 'figure' (return figure object)
+
+    Returns:
+        If output_type == 'figure', returns the matplotlib figure object
+        Otherwise, displays the visualization in the notebook
+    """
+    forecast = weather_data.get("forecast", [])
+    if not forecast:
+        print("No forecast data available for precipitation visualization.")
+        return None
+
+    # Take daily average chance of rain
+    dates = []
+    avg_precip = []
+    for f in forecast:
+        dates.append(f["date"])
+        hourly = f.get("hourly", [])
+        if hourly:
+            chances = [int(h.get("chance_of_rain", 0)) for h in hourly]
+            avg_precip.append(sum(chances) // len(chances))
+        else:
+            avg_precip.append(0)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(dates, avg_precip, color="skyblue", alpha=0.7)
+
+    ax.set_title("Average Daily Chance of Rain")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Chance of Rain (%)")
+    ax.set_ylim(0, 100)
+    ax.grid(True, linestyle="--", alpha=0.6, axis="y")
+
+    if output_type == "figure":
+        return fig
+    else:
+        plt.show()
+        return None
+
+🔎 How it Works
+
+Temperature plot:
+
+X-axis = forecast dates
+
+Two lines = min & max temps
+
+Shaded area = daily range
+
+Precipitation plot:
+
+X-axis = dates
+
+Y-axis = average chance of rain (from hourly data)
+
+Bar chart = intuitive % chance
+
+output_type:
+
+"display" → plt.show() inside notebook
+
+"figure" → returns fig so you can embed/save later
+
+⚡ Example usage:
+
+create_temperature_visualisation(weather_data)
+create_precipitation_visualisation(weather_data)
+
+
+👉 Do you want me to also add hourly-level plots (line chart per day), or just keep daily summary for now?
