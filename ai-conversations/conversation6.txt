@@ -1,0 +1,170 @@
+
+----------------------------------
+Tool: ChatGPT
+Date: 2025-09-21
+----------------------------------
+
+ME:GIve me menu and main logic of function where tie all the function crated till now and 
+use pyinputplus for taking imput as well this should be intratic and give good user experience.
+
+AI:Got it 👍 — now let’s put everything together into a main program loop with a menu system that:
+
+Uses pyinputplus to handle input safely.
+
+Gives the user choices (ask question, see temperature chart, see precipitation chart, exit).
+
+Internally ties together your functions:
+
+get_weather_data
+
+parse_weather_question
+
+generate_weather_response
+
+create_temperature_visualisation (and precipitation visualisation).
+
+Full Example Code
+import pyinputplus as pyip
+
+# --- Assuming all your functions are already imported/defined ---
+# get_weather_data
+# parse_weather_question
+# generate_weather_response
+# create_temperature_visualisation
+
+def main():
+    print("="*50)
+    print(" 🌦 Welcome to the Weather Assistant 🌦")
+    print("="*50)
+
+    while True:
+        print("\nWhat would you like to do?")
+        choice = pyip.inputMenu(
+            choices=[
+                "Ask a weather question",
+                "Show temperature chart",
+                "Show precipitation chart",
+                "Exit"
+            ],
+            numbered=True,   # show numbers before each option
+            prompt="Select an option:\n",
+        )
+
+        # --- Option 1: Ask a weather question ---
+        if choice == "Ask a weather question":
+            question = pyip.inputStr("Type your weather question: ")
+            
+            parsed = parse_weather_question(question)
+            if not parsed.get("location"):
+                print("❌ I couldn’t detect a location in your question. Try again.")
+                continue
+            
+            weather_data = get_weather_data(parsed["location"], forecast_days=3)
+            if not weather_data:
+                print("⚠️ Sorry, weather data could not be fetched.")
+                continue
+
+            response = generate_weather_response(parsed, weather_data)
+            print("\n👉 " + response)
+
+        # --- Option 2: Show temperature chart ---
+        elif choice == "Show temperature chart":
+            city = pyip.inputStr("Enter a city name: ")
+            weather_data = get_weather_data(city, forecast_days=3)
+            if weather_data:
+                print(f"📊 Generating temperature chart for {city}...")
+                create_temperature_visualisation(weather_data, output_type="display", show_precip=False)
+            else:
+                print("⚠️ No data available for this location.")
+
+        # --- Option 3: Show precipitation chart ---
+        elif choice == "Show precipitation chart":
+            city = pyip.inputStr("Enter a city name: ")
+            weather_data = get_weather_data(city, forecast_days=3)
+            if weather_data:
+                print(f"📊 Generating precipitation chart for {city}...")
+                create_temperature_visualisation(weather_data, output_type="display", show_precip=True)
+            else:
+                print("⚠️ No data available for this location.")
+
+        # --- Option 4: Exit ---
+        elif choice == "Exit":
+            print("\n👋 Goodbye! Stay weather-wise!")
+            break
+
+# Run the app
+if __name__ == "__main__":
+    main()
+
+🔍 Key Features
+
+Menu navigation with pyinputplus
+
+Cleaner than plain input().
+
+Prevents invalid input (e.g., typing random text instead of choosing a menu option).
+
+User-friendly feedback
+
+Uses emojis & clear messages (⚠️, 👉, 📊, ❌) for better experience.
+
+Error handling
+
+If no location found in question → asks again.
+
+If weather API fails → shows a warning.
+
+Separation of concerns
+
+Ask a question → Uses NLP parser + response generator.
+
+Show charts → Directly fetches city forecast & visualizes.
+
+✅ With this structure, your project now feels like a complete interactive assistant.
+
+Would you like me to also add a history log (like storing all questions & answers in a list and showing them when the user selects “View History”)? That could make testing & debugging easier.
+
+ME: After showing the chart in menu it is not able to take input again.
+AI:That’s not your bug, it’s the way matplotlib hijacks control. When you call plt.show(), it blocks the program until the user closes the chart window. That’s why after showing the chart, your menu looks “stuck” until you close the plot.
+
+There are two main fixes depending on how you want to use your weather app:
+
+1. Non-blocking plots (best for console apps)
+
+Tell matplotlib to continue running while the chart window stays open:
+
+import matplotlib.pyplot as plt
+
+plt.ion()   # turn on interactive mode (non-blocking)
+
+
+And inside your create_temperature_visualisation function, instead of just plt.show(), do:
+
+plt.show(block=False)
+plt.pause(2)   # give the plot time to render
+
+
+Now the menu loop will continue, and the user can interact again while the chart is still open.
+
+2. Close chart automatically
+
+If you don’t want the chart window to stay open (like a “quick peek”), you can auto-close it:
+
+plt.show(block=False)
+plt.pause(3)   # show for 3 seconds
+plt.close()
+
+
+This way the chart flashes up, then disappears, and your menu keeps working.
+
+3. Jupyter Notebook case
+
+If you’re running this in Jupyter instead of a terminal app, plt.show() doesn’t block anyway — it just displays inline. In that case, your menu “not working” is probably because pyinputplus is waiting for input in the console, not the notebook. The fix is: run the whole menu system as a regular Python script, not inside a notebook cell.
+
+⚡ Bottom line:
+
+For a script/console project, go with option 1 (non-blocking with plt.ion() + plt.show(block=False)).
+
+For a demo notebook, just stick with inline plots.
+
+Do you want me to rewrite your create_temperature_visualisation so it uses the non-blocking version (option 1), so your menu keeps flowing nicely?
