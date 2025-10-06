@@ -1,0 +1,664 @@
+
+----------------------------------
+Tool: Claud
+Date: 2025-09-15
+----------------------------------
+
+
+
+Me:I am developing a weather wise application which have different functions, you have to give me test cases for all the edges point for a specific function which I'll provide. 
+Basically you have to work as tester. So now give me the test case for the given code as well tell me about the weak point of the function where the below function can fail and give wrong output:
+def get_weather_data(location, forecast_days=5):
+    """
+    Retrieve weather data for a specified location from wttr.in API.
+
+    Args:
+        location (str): City or location name.
+        forecast_days (int): Number of days to forecast (1-5).
+
+    Returns:
+        dict: Weather data including current conditions and forecast.
+    """
+    # Safety check for days
+    if forecast_days < 1 or forecast_days > 5:
+        raise ValueError("forecast_days must be between 1 and 5")
+
+    try:
+        url = f"https://wttr.in/{location}?format=j1"
+        response = requests.get(url)
+        response.raise_for_status()  # Raise error for bad response
+        raw_data = response.json()
+
+        # Extract current condition
+        current = raw_data.get("current_condition", [])[0]
+
+        # Extract forecast days
+        forecast = raw_data.get("weather", [])[:forecast_days]
+
+        # Restructure into clean dict
+        weather_data = {
+            "location": location,
+            "current": {
+                "temperature_C": current.get("temp_C"),
+                "condition": current.get("weatherDesc", [{}])[0].get("value"),
+                "humidity": current.get("humidity"),
+                "feels_like_C": current.get("FeelsLikeC"),
+            },
+            "forecast": []
+        }
+
+        for day in forecast:
+            day_info = {
+                "date": day.get("date"),
+                "max_temp_C": day.get("maxtempC"),
+                "min_temp_C": day.get("mintempC"),
+                "hourly": []
+            }
+
+            for hour in day.get("hourly", []):
+                day_info["hourly"].append({
+                    "time": hour.get("time"),
+                    "temp_C": hour.get("tempC"),
+                    "precip_mm": hour.get("precipMM"),
+                    "chance_of_rain": hour.get("chanceofrain"),
+                    "condition": hour.get("weatherDesc", [{}])[0].get("value"),
+                })
+
+            weather_data["forecast"].append(day_info)
+
+        return weather_data
+
+    except requests.RequestException as e:
+        print(f"Error fetching data from wttr.in: {e}")
+        return {}
+
+
+
+AI: Main Problems with Your Function:
+
+Crashes when API returns empty data
+Returns {} on errors (hard to detect failures)
+No input checking for location
+
+Basic Test Cases:
+Test 1: Normal Usage
+pythondata = get_weather_data("Tokyo", forecast_days=3)
+print(data["current"])
+print(data["forecast"][0])
+Test 2: Invalid City
+pythondata = get_weather_data("FakeCity123", forecast_days=3)
+print(data)  # Will print {} - but is this an error or empty data?
+Test 3: Empty Location
+pythondata = get_weather_data("", forecast_days=3)
+print(data)  # Will probably crash or return {}
+Test 4: Bad forecast_days
+pythondata = get_weather_data("Sydney", forecast_days=10)  # Should raise ValueError
+Test 5: Special Characters
+pythondata = get_weather_data("São Paulo", forecast_days=2)
+print(data["current"]["temperature_C"])
+Where Your Function Will Break:
+Problem 1: API Returns Empty Data
+python# This will CRASH your function:
+# current = raw_data.get("current_condition", [])[0]  
+# If current_condition is empty [], this crashes with IndexError
+Problem 2: Network Issues
+python# When internet is down, function returns {}
+# You can't tell if {} means "no data" or "error occurred"
+data = get_weather_data("Sydney")
+if data == {}:
+    print("Is this an error or empty data?")  # Can't tell!
+Problem 3: Missing Data Fields
+pythondata = get_weather_data("ValidCity")
+temp = data["current"]["temperature_C"]  # Might be None
+if temp is None:
+    print("Temperature missing!")  # Function doesn't warn you
+Quick Fix Suggestions:
+Better Error Handling:
+python# Instead of returning {}, return something clear:
+return {"error": "Could not fetch weather data"}
+Check Before Accessing:
+python# Instead of:
+current = raw_data.get("current_condition", [])[0]
+
+# Use:
+current_list = raw_data.get("current_condition", [])
+if not current_list:
+    return {"error": "No current weather data"}
+current = current_list[0]
+Input Validation:
+python# Add at start of function:
+if not location or not isinstance(location, str):
+    return {"error": "Location must be a valid city name"}
+Your function works for happy cases but fails badly when things go wrong. The main issue is it tries to access data that might not exist.
+
+ME:Analyze this function as well give me the test and edge cased for this function:
+import re
+import calendar
+from datetime import datetime, timedelta
+
+# --- helpers / constants ---
+DATE_WORDS = {
+    "today", "tomorrow", "tonight", "now",
+    "this", "next", "weekend",
+    # weekday names will be added dynamically below
+}
+WEEKDAYS = [d.lower() for d in calendar.day_name]  # monday, tuesday, ...
+DATE_WORDS.update(WEEKDAYS)
+
+# used in the regex positive lookahead to stop capturing location before any of these words
+_STOP_WORDS_PATTERN = r"(?:today|tomorrow|tonight|now|this|next|on|for|at|in|during|am|pm|morning|afternoon|evening|" + \
+                      "|".join(WEEKDAYS) + r")"
+
+
+def _parse_date_from_text(text):
+    """Return a datetime.date object for 'today', 'tomorrow', or next weekday if mentioned. Defaults to today."""
+    text_l = text.lower()
+    today = datetime.today().date()
+
+    if re.search(r"\btoday\b", text_l) or re.search(r"\bnow\b", text_l) or re.search(r"\btonight\b", text_l):
+        return today
+
+    if re.search(r"\btomorrow\b", text_l):
+        return today + timedelta(days=1)
+
+    # check for weekday names
+    for i, wd in enumerate(calendar.day_name):  # Monday..Sunday
+        if re.search(r"\b" + wd.lower() + r"\b", text_l):
+            # compute next date for that weekday (could be today if weekday matches)
+            days_ahead = (i - today.weekday()) % 7
+            # if they asked "Monday" and today is Monday, assume they mean today; you could choose +7 to mean next week
+            return today + timedelta(days=days_ahead)
+
+    # default
+    return today
+
+
+def _extract_location(user_question):
+    """
+    Try several heuristics to extract a location from the question:
+      1) look for "in <location>" but stop at date words or punctuation
+      2) fallback: extract capitalized multiword tokens (e.g. "New York")
+      3) final fallback: take the last 1-2 tokens that are not date / filler words
+    Returns None if nothing plausible found.
+    """
+    q = user_question.strip()
+
+    # 1) 'in <location>' pattern but stop before day/date words and punctuation
+    # The lookahead ensures the captured group doesn't swallow 'tomorrow' etc.
+    pattern = re.compile(r"\bin\s+([A-Za-z\u00C0-\u017F\-\s]+?)(?=\s+(?:" + _STOP_WORDS_PATTERN + r")\b|[?.!,]|$)",
+                         re.IGNORECASE)
+    m = pattern.search(q)
+    if m:
+        loc = m.group(1).strip()
+        # drop trailing filler if any accidental
+        return loc.strip(" ,.?!")
+
+    # 2) Try to find capitalized sequences (Good for "Tokyo", "New York", but won't work if user typed lowercase)
+    cap_matches = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', user_question)
+    if cap_matches:
+        # choose the longest capitalized match (often the real location)
+        loc = max(cap_matches, key=lambda s: len(s.split()))
+        return loc.strip(" ,.?!")
+
+    # 3) Fallback: token heuristic
+    # remove punctuation, split
+    cleaned = re.sub(r'[?.!,;:]', ' ', q)
+    tokens = [t for t in cleaned.split() if t.strip()]
+    # remove common filler / date words
+    filler = {"will", "it", "be", "is", "what", "weather", "for", "the", "in", "on", "do", "i", "need", "an", "if", "should"}
+    tokens_filtered = [t for t in tokens if t.lower() not in filler and t.lower() not in DATE_WORDS]
+
+    if not tokens_filtered:
+        return None
+
+    # prefer last two tokens as a multiword location (e.g., "los angeles")
+    if len(tokens_filtered) >= 2:
+        candidate = " ".join(tokens_filtered[-2:])
+    else:
+        candidate = tokens_filtered[-1]
+    return candidate.strip(" ,.?!")
+
+
+# --- main function ---
+def parse_weather_question(user_question):
+    """
+    Parse a weather question into structured info and fetch weather data using get_weather_data().
+
+    Returns dict with keys:
+      - intent: 'precipitation' | 'temperature' | 'condition'
+      - location: string (or None)
+      - date: 'YYYY-MM-DD' (string)
+      - date_obj: datetime.date object (useful internally)
+      - raw_weather: dict returned by get_weather_data (or {} on failure)
+      - forecast_match: daily forecast dict that matches the requested date (or None)
+    """
+    if not isinstance(user_question, str) or not user_question.strip():
+        raise ValueError("user_question must be a non-empty string")
+
+    q = user_question.strip()
+    q_lower = q.lower()
+
+    # --- 1) intent detection (simple keywords) ---
+    if any(w in q_lower for w in ["rain", "snow", "precip", "umbrella", "wet", "drizzle", "storm"]):
+        intent = "precipitation"
+    elif any(w in q_lower for w in ["temp", "temperature", "hot", "cold", "warm", "degrees", "°c", "°f"]):
+        intent = "temperature"
+    else:
+        intent = "condition"
+
+    # --- 2) date parsing ---
+    date_obj = _parse_date_from_text(q)
+    date_str = date_obj.isoformat()
+
+    # --- 3) location extraction ---
+    location = _extract_location(q)
+    # fallback default if none found (you may change this to None or IP-based)
+    if not location:
+        # safer to require location? For now return None but still attempt to fetch local weather if get_weather_data supports empty => remote IP
+        location = None
+
+    # --- 4) determine how many forecast days to request from wttr.in ---
+    today = datetime.today().date()
+    days_needed = (date_obj - today).days + 1  # e.g., today->1, tomorrow->2
+    # clamp to 1..5 (wttr.in provides up to 5 days as per our earlier code)
+    if days_needed < 1:
+        days_needed = 1
+    if days_needed > 5:
+        days_needed = 5
+
+    # --- 5) fetch weather (call your existing get_weather_data) ---
+    raw_weather = {}
+    forecast_match = None
+    if location:
+        try:
+            raw_weather = get_weather_data(location, forecast_days=days_needed)
+        except Exception as e:
+            # get_weather_data should already handle requests exceptions; keep safe here
+            print(f"Error calling get_weather_data: {e}")
+            raw_weather = {}
+
+    else:
+        # no location found; you can choose to raise, default, or attempt local IP-based lookup.
+        print("No location detected in the question. Please include a city (e.g., 'in Tokyo').")
+        raw_weather = {}
+
+    # --- 6) try to match requested date to the day's forecast (wttr.in returns 'date' as 'YYYY-MM-DD' strings) ---
+    if raw_weather and "forecast" in raw_weather:
+        for day in raw_weather["forecast"]:
+            if day.get("date") == date_str:
+                forecast_match = day
+                break
+        # if exact date not found, attempt a best-effort fallback (first forecast day)
+        if not forecast_match and raw_weather["forecast"]:
+            forecast_match = raw_weather["forecast"][0]  # default to first day
+
+    result = {
+        "intent": intent,
+        "location": location,
+        "date": date_str,
+        "date_obj": date_obj,
+        "raw_weather": raw_weather,
+        "forecast_match": forecast_match,
+    }
+    return result
+
+
+AI:Test Cases and Vulnerability Analysis for parse_weather_question()
+Critical Weaknesses Identified
+1. Dependency on External Function
+pythonraw_weather = get_weather_data(location, forecast_days=days_needed)
+If get_weather_data() is broken, this function fails silently.
+2. Poor Location Extraction Logic
+The regex patterns are overly complex and will miss many valid cases.
+3. Silent Failures
+Returns empty data instead of clear error indicators.
+Basic Test Cases
+Test 1: Simple Valid Questions
+python# Basic functionality
+result = parse_weather_question("What's the weather in Tokyo?")
+print(result["location"])  # Should be "Tokyo"
+print(result["intent"])    # Should be "condition"
+Test 2: Date Parsing
+pythonresult = parse_weather_question("Will it rain tomorrow in Sydney?")
+print(result["date"])      # Tomorrow's date
+print(result["intent"])    # Should be "precipitation"
+Test 3: Temperature Questions
+pythonresult = parse_weather_question("How hot will it be in London?")
+print(result["intent"])    # Should be "temperature"
+print(result["location"])  # Should be "London"
+Test 4: Invalid Inputs
+python# Empty string
+result = parse_weather_question("")  # Will raise ValueError
+
+# None input
+result = parse_weather_question(None)  # Will raise ValueError
+Test 5: No Location Questions
+pythonresult = parse_weather_question("Will it rain tomorrow?")
+print(result["location"])     # Will be None
+print(result["raw_weather"])  # Will be empty {}
+
+ME: AS a Q&A engineer give me test case for the given below function:
+def generate_weather_response(parsed_question, weather_data):
+    """
+    Generate a natural language response to a weather question.
+
+    Args:
+        parsed_question (dict): Parsed question data
+        weather_data (dict): Weather data (parsed into 'location', 'current', 'forecast')
+
+    Returns:
+        str: Natural language response
+    """
+    intent = parsed_question.get("intent")
+    location = parsed_question.get("location", "the specified location")
+    date = parsed_question.get("date")
+
+    # Safety: check if we even have a forecast
+    forecast_days = weather_data.get("forecast", [])
+    chosen_day = None
+    for day in forecast_days:
+        if day.get("date") == str(date):   # match exact date
+            chosen_day = day
+            break
+
+    if not chosen_day:
+        return f"Sorry, I couldn't find a forecast for {date} in {location}."
+
+    # Handle intents
+    if intent in ["rain", "precipitation"]:
+        # take the last hourly slot (usually night) with rain chance
+        hourly = chosen_day.get("hourly", [])
+        if hourly:
+            best_slot = max(hourly, key=lambda h: int(h.get("chance_of_rain", 0)))
+            chance = best_slot.get("chance_of_rain", "0")
+            condition = best_slot.get("condition", "").strip()
+            return f"In {location.title()} on {date}, there is a {chance}% chance of rain ({condition})."
+        return f"In {location.title()} on {date}, I couldn't find rain information."
+
+    elif intent == "temperature":
+        max_temp = chosen_day.get("max_temp_C", "N/A")
+        min_temp = chosen_day.get("min_temp_C", "N/A")
+        return f"The temperature in {location.title()} on {date} will range from {min_temp}°C to {max_temp}°C."
+
+    elif intent == "weather":
+        hourly = chosen_day.get("hourly", [])
+        if hourly:
+            mid_day = hourly[len(hourly)//2]
+            condition = mid_day.get("condition", "unknown").strip()
+            return f"The weather in {location.title()} on {date} is expected to be {condition}."
+        return f"The weather forecast in {location.title()} on {date} is unavailable."
+
+    else:
+        # fallback summary
+        return (
+            f"In {location.title()} on {date}, "
+            f"temps will range {chosen_day.get('min_temp_C', 'N/A')}°C–{chosen_day.get('max_temp_C', 'N/A')}°C "
+            f"with some chance of rain."
+        )
+
+As well propose better solution if there any exist
+
+AI:Test Cases for generate_weather_response() Function
+Critical Issues Identified in Current Implementation
+
+Hardcoded intent values don't match typical parsing output ("rain" vs "precipitation")
+No validation of input parameters
+Silent failures when data is malformed
+Complex hourly data logic that assumes specific structure
+No error handling for missing weather_data structure
+
+Comprehensive Test Cases
+Input Validation Tests
+pythondef test_input_validation():
+    # Test 1: None inputs
+    result = generate_weather_response(None, {})
+    # Expected: Should handle gracefully, not crash
+    
+    # Test 2: Empty dictionaries
+    result = generate_weather_response({}, {})
+    # Expected: Should return meaningful error message
+    
+    # Test 3: Invalid data types
+    result = generate_weather_response("not_a_dict", [])
+    # Expected: Should handle type errors gracefully
+    
+    # Test 4: Missing required keys
+    result = generate_weather_response({"intent": "temperature"}, {"forecast": []})
+    # Expected: Should handle missing date/location
+Intent Matching Tests
+pythondef test_intent_matching():
+    base_parsed = {"location": "Sydney", "date": "2024-01-15"}
+    base_weather = {
+        "forecast": [{
+            "date": "2024-01-15",
+            "max_temp_C": "25",
+            "min_temp_C": "18",
+            "hourly": [{"condition": "Sunny", "chance_of_rain": "10"}]
+        }]
+    }
+    
+    # Test 5: Intent "rain" (hardcoded in function)
+    parsed = {**base_parsed, "intent": "rain"}
+    result = generate_weather_response(parsed, base_weather)
+    # Expected: Rain-related response
+    
+    # Test 6: Intent "precipitation" (common but not handled)
+    parsed = {**base_parsed, "intent": "precipitation"}
+    result = generate_weather_response(parsed, base_weather)
+    # Expected: Falls to default case - BUG
+    
+    # Test 7: Intent "temperature"
+    parsed = {**base_parsed, "intent": "temperature"}
+    result = generate_weather_response(parsed, base_weather)
+    # Expected: Temperature range response
+Date Matching Edge Cases
+pythondef test_date_matching():
+    # Test 8: Exact date match
+    parsed_question = {"intent": "temperature", "location": "Tokyo", "date": "2024-01-15"}
+    weather_data = {
+        "forecast": [
+            {"date": "2024-01-15", "max_temp_C": "20", "min_temp_C": "10"}
+        ]
+    }
+    result = generate_weather_response(parsed_question, weather_data)
+    # Expected: Temperature response for Tokyo
+    
+    # Test 9: No date match
+    parsed_question = {"intent": "temperature", "location": "Tokyo", "date": "2024-01-20"}
+    weather_data = {
+        "forecast": [
+            {"date": "2024-01-15", "max_temp_C": "20", "min_temp_C": "10"}
+        ]
+    }
+    result = generate_weather_response(parsed_question, weather_data)
+    # Expected: "Sorry, I couldn't find a forecast for 2024-01-20"
+    
+    # Test 10: Date type mismatch (int vs string)
+    parsed_question = {"intent": "temperature", "location": "Tokyo", "date": 20240115}
+    # Expected: str() conversion should handle this
+Malformed Weather Data Tests
+pythondef test_malformed_data():
+    # Test 11: Missing forecast key
+    result = generate_weather_response(
+        {"intent": "temperature", "location": "Sydney", "date": "2024-01-15"},
+        {}  # No forecast key
+    )
+    # Expected: Should handle missing forecast gracefully
+    
+    # Test 12: Forecast is None
+    result = generate_weather_response(
+        {"intent": "temperature", "location": "Sydney", "date": "2024-01-15"},
+        {"forecast": None}
+    )
+    # Expected: Should not crash on None.get()
+    
+    # Test 13: Empty hourly data
+    result = generate_weather_response(
+        {"intent": "rain", "location": "Sydney", "date": "2024-01-15"},
+        {"forecast": [{"date": "2024-01-15", "hourly": []}]}
+    )
+    # Expected: Should handle empty hourly array
+    
+    # Test 14: Missing temperature fields
+    result = generate_weather_response(
+        {"intent": "temperature", "location": "Sydney", "date": "2024-01-15"},
+        {"forecast": [{"date": "2024-01-15"}]}  # No temp fields
+    )
+    # Expected: Should show "N/A" for missing temperatures
+Hourly Data Processing Tests
+pythondef test_hourly_data_logic():
+    # Test 15: Multiple hourly entries
+    weather_data = {
+        "forecast": [{
+            "date": "2024-01-15",
+            "hourly": [
+                {"chance_of_rain": "20", "condition": "Cloudy"},
+                {"chance_of_rain": "60", "condition": "Rainy"},  # Should be selected (max)
+                {"chance_of_rain": "30", "condition": "Partly Cloudy"}
+            ]
+        }]
+    }
+    result = generate_weather_response(
+        {"intent": "rain", "location": "Sydney", "date": "2024-01-15"},
+        weather_data
+    )
+    # Expected: Should select 60% chance entry
+    
+    # Test 16: Non-numeric chance_of_rain
+    weather_data = {
+        "forecast": [{
+            "date": "2024-01-15",
+            "hourly": [{"chance_of_rain": "high", "condition": "Rainy"}]
+        }]
+    }
+    result = generate_weather_response(
+        {"intent": "rain", "location": "Sydney", "date": "2024-01-15"},
+        weather_data
+    )
+    # Expected: int() conversion will crash - BUG
+Location Handling Tests
+pythondef test_location_handling():
+    # Test 17: Missing location
+    result = generate_weather_response(
+        {"intent": "temperature", "date": "2024-01-15"},
+        {"forecast": [{"date": "2024-01-15", "max_temp_C": "25", "min_temp_C": "15"}]}
+    )
+    # Expected: Should use "the specified location" default
+    
+    # Test 18: Location capitalization
+    result = generate_weather_response(
+        {"intent": "temperature", "location": "sydney", "date": "2024-01-15"},
+        {"forecast": [{"date": "2024-01-15", "max_temp_C": "25", "min_temp_C": "15"}]}
+    )
+    # Expected: Should capitalize to "Sydney"
+Major Bugs Found
+Bug 1: Type Conversion Crash
+python# This will crash if chance_of_rain is not numeric:
+best_slot = max(hourly, key=lambda h: int(h.get("chance_of_rain", 0)))
+Bug 2: Intent Mismatch
+python# Function checks for "rain" but typical parsers return "precipitation"
+if intent in ["rain", "precipitation"]:  # Only "rain" is actually handled
+Bug 3: No Input Validation
+python# No checks for None inputs or wrong types
+intent = parsed_question.get("intent")  # Could crash if parsed_question is None
+Improved Implementation
+pythondef generate_weather_response(parsed_question, weather_data):
+    """
+    Generate a natural language response to a weather question.
+    Improved version with better error handling and validation.
+    """
+    # Input validation
+    if not isinstance(parsed_question, dict):
+        return "Invalid question format provided."
+    
+    if not isinstance(weather_data, dict):
+        return "Invalid weather data provided."
+    
+    intent = parsed_question.get("intent", "general")
+    location = parsed_question.get("location", "the specified location")
+    date = str(parsed_question.get("date", ""))  # Ensure string conversion
+    
+    # Validate weather data structure
+    forecast_days = weather_data.get("forecast")
+    if not isinstance(forecast_days, list):
+        return f"No forecast data available for {location}."
+    
+    # Find matching date
+    chosen_day = None
+    for day in forecast_days:
+        if isinstance(day, dict) and str(day.get("date", "")) == date:
+            chosen_day = day
+            break
+    
+    if not chosen_day:
+        return f"Sorry, I couldn't find a forecast for {date} in {location}."
+    
+    # Handle different intents with better error handling
+    if intent in ["rain", "precipitation"]:
+        return _handle_precipitation_intent(chosen_day, location, date)
+    elif intent == "temperature":
+        return _handle_temperature_intent(chosen_day, location, date)
+    elif intent in ["weather", "general"]:
+        return _handle_general_weather_intent(chosen_day, location, date)
+    else:
+        return _handle_fallback_response(chosen_day, location, date)
+
+def _handle_precipitation_intent(day, location, date):
+    """Handle precipitation-related queries with error checking."""
+    hourly = day.get("hourly", [])
+    if not isinstance(hourly, list) or not hourly:
+        return f"In {location.title()} on {date}, I couldn't find detailed rain information."
+    
+    try:
+        # Safely find highest rain chance
+        best_slot = None
+        max_chance = -1
+        
+        for hour in hourly:
+            if isinstance(hour, dict):
+                chance_str = hour.get("chance_of_rain", "0")
+                try:
+                    chance = int(chance_str)
+                    if chance > max_chance:
+                        max_chance = chance
+                        best_slot = hour
+                except (ValueError, TypeError):
+                    continue
+        
+        if best_slot:
+            condition = best_slot.get("condition", "").strip()
+            return f"In {location.title()} on {date}, there is a {max_chance}% chance of rain ({condition})."
+        else:
+            return f"In {location.title()} on {date}, rain information is not available."
+    
+    except Exception:
+        return f"In {location.title()} on {date}, I couldn't process the rain forecast."
+
+def _handle_temperature_intent(day, location, date):
+    """Handle temperature queries with validation."""
+    max_temp = day.get("max_temp_C", "N/A")
+    min_temp = day.get("min_temp_C", "N/A")
+    return f"The temperature in {location.title()} on {date} will range from {min_temp}°C to {max_temp}°C."
+
+def _handle_general_weather_intent(day, location, date):
+    """Handle general weather queries."""
+    hourly = day.get("hourly", [])
+    if isinstance(hourly, list) and hourly:
+        try:
+            mid_index = len(hourly) // 2
+            mid_day = hourly[mid_index]
+            if isinstance(mid_day, dict):
+                condition = mid_day.get("condition", "unknown").strip()
+                return f"The weather in {location.title()} on {date} is expected to be {condition}."
+        except (IndexError, TypeError):
+            pass
+    
+    return f"The weather forecast in {location.title()} on {date} is unavailable."
+
+def _handle_fallback_response(day, location, date):
+    """Fallback response for unknown intents."""
+    max_temp = day.get("max_temp_C", "N/A")
+    min_temp = day.get("min_temp_C", "N/A")
+    return (f"In {location.title()} on {date}, "
+            f"temps will range {min_temp}°C–{max_temp}°C with some chance of rain.")
+The improved version addresses the major issues: input validation, type safety, better error handling, and more robust data processing.
